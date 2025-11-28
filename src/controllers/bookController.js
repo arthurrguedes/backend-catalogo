@@ -1,12 +1,10 @@
 const db = require('../db');
 
 const bookController = {
-
-    // --- LEITURA (READ) ---
-
+    // Listar todos
     getAllBooks: async (req, res) => {
         try {
-            // Query otimizada com GROUP_CONCAT para trazer autores/generos numa linha só
+            // Query com GROUP_CONCAT para trazer autores e generos numa linha só
             const query = `
                 SELECT 
                     l.idLivro, l.titulo, l.ano, l.editora, l.isbn, l.edicao,
@@ -55,24 +53,23 @@ const bookController = {
         }
     },
 
-    // --- CRIAÇÃO (CREATE) COMPLETA ---
+    // Criar livro
 
     createBook: async (req, res) => {
-        // Agora esperamos arrays de IDs para autores e generos
         const { titulo, ano, edicao, editora, isbn, estoqueInicial, autoresIds, generosIds } = req.body;
 
-        const connection = await db.getConnection(); // Usamos conexão para transação
+        const connection = await db.getConnection(); 
         try {
             await connection.beginTransaction();
 
-            // 1. Insere o Livro
+            // Insere o Livro
             const [result] = await connection.query(
                 `INSERT INTO livro (titulo, ano, edicao, editora, isbn) VALUES (?, ?, ?, ?, ?)`,
                 [titulo, ano, edicao, editora, isbn]
             );
             const idLivro = result.insertId;
 
-            // 2. Cria o Estoque Inicial
+            // Cria o estoque inicial
             if (estoqueInicial !== undefined) {
                 await connection.query(
                     `INSERT INTO estoque (idLivro, quantidade) VALUES (?, ?)`,
@@ -80,7 +77,7 @@ const bookController = {
                 );
             }
 
-            // 3. Vincula Autores (se houver)
+            // Vincular autores
             if (autoresIds && Array.isArray(autoresIds)) {
                 for (const idAutor of autoresIds) {
                     await connection.query(
@@ -90,7 +87,7 @@ const bookController = {
                 }
             }
 
-            // 4. Vincula Gêneros (se houver)
+            // Vincular gêneros
             if (generosIds && Array.isArray(generosIds)) {
                 for (const idGenero of generosIds) {
                     await connection.query(
@@ -104,7 +101,7 @@ const bookController = {
             res.status(201).json({ message: "Livro criado com sucesso!", id: idLivro });
 
         } catch (error) {
-            await connection.rollback(); // Desfaz tudo se der erro
+            await connection.rollback(); // Desfaz tudo caso gere erro
             console.error(error);
             res.status(500).json({ error: "Erro ao criar livro. Verifique os dados." });
         } finally {
@@ -112,15 +109,13 @@ const bookController = {
         }
     },
 
-    // --- ATUALIZAÇÃO (UPDATE) ---
+    // Atualização do livro
 
     updateBook: async (req, res) => {
         const { id } = req.params;
         const { titulo, ano, edicao, editora, isbn } = req.body;
 
         try {
-            // Atualiza apenas dados básicos do livro por enquanto
-            // (Atualizar relacionamentos é mais complexo, vamos focar no principal)
             const query = `
                 UPDATE livro 
                 SET titulo = ?, ano = ?, edicao = ?, editora = ?, isbn = ?
@@ -133,6 +128,7 @@ const bookController = {
         }
     },
 
+    // Atualiza o estoque
     updateStock: async (req, res) => {
         const { id } = req.params;
         const { novaQuantidade } = req.body;
@@ -150,7 +146,7 @@ const bookController = {
         }
     },
 
-    // --- DELEÇÃO (DELETE) ---
+    // Deletar livro
 
     deleteBook: async (req, res) => {
         const { id } = req.params;
@@ -159,12 +155,12 @@ const bookController = {
         try {
             await connection.beginTransaction();
 
-            // Remove dependências primeiro (Cascade manual se o banco não tiver)
+            // Removendo dependências primeiro
             await connection.query('DELETE FROM estoque WHERE idLivro = ?', [id]);
             await connection.query('DELETE FROM livroautor WHERE idLivro = ?', [id]);
             await connection.query('DELETE FROM livrogenero WHERE idLivro = ?', [id]);
             
-            // Remove o livro
+            // Removendo o livro
             const [result] = await connection.query('DELETE FROM livro WHERE idLivro = ?', [id]);
 
             if (result.affectedRows === 0) {
@@ -176,7 +172,6 @@ const bookController = {
             res.json({ message: "Livro deletado com sucesso" });
         } catch (error) {
             await connection.rollback();
-            // Erro comum: FK constraint com empréstimos (não podemos apagar livro emprestado)
             res.status(500).json({ error: "Não é possível deletar este livro (pode haver empréstimos ativos)." });
         } finally {
             connection.release();

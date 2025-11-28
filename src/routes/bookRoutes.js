@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bookController = require('../controllers/bookController');
 
-// Listar e Detalhar
+// Listar 
 router.get('/', bookController.getAllBooks);
 router.get('/genres', bookController.getAllGenres);
 router.get('/:id', bookController.getBookById);

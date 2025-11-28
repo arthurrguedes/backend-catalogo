@@ -5,7 +5,7 @@ require('dotenv').config();
 const bookRoutes = require('./routes/bookRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 4002; // Porta 4002 para não conflitar com Usuários (4001)
+const PORT = process.env.PORT || 4002;
 
 app.use(cors());
 app.use(express.json());
